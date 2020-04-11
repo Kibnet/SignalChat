@@ -5,14 +5,13 @@
                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                    xmlns:local="clr-namespace:ChatClientCS"
                    xmlns:data="clr-namespace:ChatClientCS.Data"
-                   xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
                    mc:Ignorable="d"
                    xmlns:metro="http://metro.mahapps.com/winfx/xaml/controls"
-                   xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"  
+                   xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes" xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
                    Background="{DynamicResource MaterialDesignPaper}"
                    DataContext="{Binding Source={StaticResource VMLocator}, Path=MainVM}"
                    d:DataContext="{d:DesignInstance IsDesignTimeCreatable=True, Type={x:Type data:SampleMainWindowViewModel}}"
-                   Title="SignalChat" Height="450" Width="670" TitleCaps="False" TitleCharacterCasing="Normal" 
+                   Title="SignalChat" Height="450" Width="670" TitleCharacterCasing="Normal" 
                    ShowTitleBar="True" BorderBrush="{DynamicResource PrimaryHueDarkBrush}">
     <i:Interaction.Triggers>
         <i:EventTrigger>

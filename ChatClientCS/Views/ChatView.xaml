@@ -8,7 +8,7 @@
              xmlns:data="clr-namespace:ChatClientCS.Data"
              xmlns:utils="clr-namespace:ChatClientCS.Utils"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-             xmlns:Converters="clr-namespace:MaterialDesignThemes.Wpf.Converters;assembly=MaterialDesignThemes.Wpf"             
+             xmlns:Converters="clr-namespace:MaterialDesignThemes.Wpf.Converters;assembly=MaterialDesignThemes.Wpf" xmlns:i1="http://schemas.microsoft.com/xaml/behaviors"
              Background="{DynamicResource MaterialDesignPaper}"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance IsDesignTimeCreatable=True, Type={x:Type data:SampleMainWindowViewModel}}"
@@ -218,14 +218,14 @@
                         <Image Stretch="UniformToFill" Cursor="Hand" 
                                ToolTip="Click to open image in your default image viewer"
                                Source="{Binding Picture}">
-                            <i:Interaction.Triggers>
-                                <i:EventTrigger EventName="MouseLeftButtonUp">
-                                    <i:InvokeCommandAction
+                            <i1:Interaction.Triggers>
+                                <i1:EventTrigger EventName="MouseLeftButtonUp">
+                                    <i1:InvokeCommandAction
                                         Command="{Binding DataContext.OpenImageCommand, 
                                         RelativeSource={RelativeSource FindAncestor, AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"/>
-                                </i:EventTrigger>
-                            </i:Interaction.Triggers>
+                                </i1:EventTrigger>
+                            </i1:Interaction.Triggers>
                         </Image>
                     </Grid>
                     <TextBlock x:Name="MessageTxtBlock" Grid.Row="1" Margin="7,5,7,0" TextWrapping="Wrap" 
@@ -289,9 +289,9 @@
                       ItemsSource="{Binding SelectedParticipant.Chatter}" 
                       ItemTemplate="{DynamicResource MessagesDataTemplate}"
                       ScrollViewer.VerticalScrollBarVisibility="Auto">
-            <i:Interaction.Behaviors>
+            <i1:Interaction.Behaviors>
                 <utils:BringNewItemIntoViewBehavior/>
-            </i:Interaction.Behaviors>
+            </i1:Interaction.Behaviors>
             <ItemsControl.Template>
                 <ControlTemplate TargetType="ItemsControl">
                     <ScrollViewer>
@@ -321,11 +321,11 @@
                                  TextWrapping="Wrap" AcceptsReturn="True" CaretBrush="#7F000000"
                                  VerticalScrollBarVisibility="Auto"
                                  Text="{Binding TextMessage, UpdateSourceTrigger=PropertyChanged}">
-                            <i:Interaction.Triggers>
-                                <i:EventTrigger EventName="KeyUp">
-                                    <i:InvokeCommandAction Command="{Binding TypingCommand}"/>
-                                </i:EventTrigger>
-                            </i:Interaction.Triggers>
+                            <i1:Interaction.Triggers>
+                                <i1:EventTrigger EventName="KeyUp">
+                                    <i1:InvokeCommandAction Command="{Binding TypingCommand}"/>
+                                </i1:EventTrigger>
+                            </i1:Interaction.Triggers>
                         </TextBox>
                         <!--Image-->
                         <Button Grid.Column="1" Foreground="#FF6E6E6E" Margin="4"

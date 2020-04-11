@@ -1,7 +1,7 @@
 ﻿using System.Collections.Specialized;
-using System.Windows.Interactivity;
 using System.Windows.Controls;
 using System.Windows;
+using Microsoft.Xaml.Behaviors;
 
 namespace ChatClientCS.Utils
 {
