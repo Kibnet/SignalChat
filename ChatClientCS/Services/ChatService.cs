@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ChatClientCS.Enums;
-using ChatClientCS.Models;
+using ChatInterface.Server;
 using System.Net;
 using Microsoft.AspNet.SignalR.Client;
 

@@ -3,113 +3,125 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
-using Microsoft.AspNet.SignalR;
+using ChatInterface.Server;
+using Microsoft.AspNetCore.SignalR;
+using SignalR.EasyUse.Server;
 
 namespace ChatServerCS
 {
-    public class ChatHub : Hub<IClient>
+    public class ChatHub : Hub, IChatHub
     {
         private static ConcurrentDictionary<string, User> ChatClients = new ConcurrentDictionary<string, User>();
 
-        public override Task OnDisconnected(bool stopCalled)
+        public override Task OnDisconnectedAsync(Exception exception)
         {
             var userName = ChatClients.SingleOrDefault((c) => c.Value.ID == Context.ConnectionId).Key;
             if (userName != null)
             {
-                Clients.Others.ParticipantDisconnection(userName);
+                Clients.Others.SendAsync(new ParticipantDisconnection { Name = userName });
                 Console.WriteLine($"<> {userName} disconnected");
             }
-            return base.OnDisconnected(stopCalled);
+            return base.OnDisconnectedAsync(exception);
         }
 
-        public override Task OnReconnected()
+        public override Task OnConnectedAsync()
         {
             var userName = ChatClients.SingleOrDefault((c) => c.Value.ID == Context.ConnectionId).Key;
             if (userName != null)
             {
-                Clients.Others.ParticipantReconnection(userName);
+                Clients.Others.SendAsync(new ParticipantReconnection { Name = userName });
                 Console.WriteLine($"== {userName} reconnected");
             }
-            return base.OnReconnected();
+            return base.OnConnectedAsync();
         }
 
-        public List<User> Login(string name, byte[] photo)
+        public async Task<List<User>> Login(string name, byte[] photo)
         {
             if (!ChatClients.ContainsKey(name))
             {
                 Console.WriteLine($"++ {name} logged in");
                 List<User> users = new List<User>(ChatClients.Values);
                 User newUser = new User { Name = name, ID = Context.ConnectionId, Photo = photo };
+                Context.Items["Name"] = name;
                 var added = ChatClients.TryAdd(name, newUser);
                 if (!added) return null;
-                Clients.CallerState.UserName = name;
-                Clients.Others.ParticipantLogin(newUser);
+                await Clients.Others.SendAsync(new ParticipantLogin { Client = newUser });
+                return users;
+            }
+            else
+            {
+                Console.WriteLine($"++ {name} logged in");
+                List<User> users = new List<User>(ChatClients.Values);
+                User newUser = new User { Name = name, ID = Context.ConnectionId, Photo = photo };
+                Context.Items["Name"] = name;
+                var added = ChatClients[name] = newUser;
+                await Clients.Others.SendAsync(new ParticipantLogin { Client = newUser });
                 return users;
             }
             return null;
         }
 
-        public void Logout()
+        public async Task Logout()
         {
-            var name = Clients.CallerState.UserName;
+            var name = Context.Items["Name"] as string;
             if (!string.IsNullOrEmpty(name))
             {
                 User client = new User();
                 ChatClients.TryRemove(name, out client);
-                Clients.Others.ParticipantLogout(name);
+                await Clients.Others.SendAsync(new ParticipantLogout { Name = name });
                 Console.WriteLine($"-- {name} logged out");
             }
         }
 
-        public void BroadcastTextMessage(string message)
+        public async Task BroadcastTextMessage(string message)
         {
-            var name = Clients.CallerState.UserName;
+            var name = Context.Items["Name"] as string;
             if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(message))
             {
-                Clients.Others.BroadcastTextMessage(name, message);
+                await Clients.Others.SendAsync(new BroadcastTextMessage { Sender = name, Message = message });
             }
         }
 
-        public void BroadcastImageMessage(byte[] img)
+        public async Task BroadcastImageMessage(byte[] img)
         {
-            var name = Clients.CallerState.UserName;
+            var name = Context.Items["Name"] as string;
             if (img != null)
             {
-                Clients.Others.BroadcastPictureMessage(name, img);
+                await Clients.Others.SendAsync(new BroadcastPictureMessage { Sender = name, Img = img });
             }
         }
 
-        public void UnicastTextMessage(string recepient, string message)
+        public async Task UnicastTextMessage(string recepient, string message)
         {
-            var sender = Clients.CallerState.UserName;
+            var sender = Context.Items["Name"] as string;
             if (!string.IsNullOrEmpty(sender) && recepient != sender &&
                 !string.IsNullOrEmpty(message) && ChatClients.ContainsKey(recepient))
             {
                 User client = new User();
                 ChatClients.TryGetValue(recepient, out client);
-                Clients.Client(client.ID).UnicastTextMessage(sender, message);
+                await Clients.Client(client.ID).SendAsync(new UnicastTextMessage { Sender = sender, Message = message });
             }
         }
 
-        public void UnicastImageMessage(string recepient, byte[] img)
+        public async Task UnicastImageMessage(string recepient, byte[] img)
         {
-            var sender = Clients.CallerState.UserName;
+            var sender = Context.Items["Name"] as string;
             if (!string.IsNullOrEmpty(sender) && recepient != sender &&
                 img != null && ChatClients.ContainsKey(recepient))
             {
                 User client = new User();
                 ChatClients.TryGetValue(recepient, out client);
-                Clients.Client(client.ID).UnicastPictureMessage(sender, img);
+                await Clients.Client(client.ID).SendAsync(new UnicastPictureMessage { Sender = sender, Img = img });
             }
         }
 
-        public void Typing(string recepient)
+        public async Task Typing(string recepient)
         {
             if (string.IsNullOrEmpty(recepient)) return;
-            var sender = Clients.CallerState.UserName;
+            var sender = Context.Items["Name"] as string;
             User client = new User();
             ChatClients.TryGetValue(recepient, out client);
-            Clients.Client(client.ID).ParticipantTyping(sender);
+            await Clients.Client(client.ID).SendAsync(new ParticipantTyping { Sender = sender });
         }
     }
 }

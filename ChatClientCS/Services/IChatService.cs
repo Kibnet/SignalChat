@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using ChatClientCS.Models;
+using ChatInterface.Server;
 using ChatClientCS.Enums;
 
 namespace ChatClientCS.Services

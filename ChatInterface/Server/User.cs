@@ -1,4 +1,4 @@
-﻿namespace ChatClientCS.Models
+﻿namespace ChatInterface.Server
 {
     public class User
     {
