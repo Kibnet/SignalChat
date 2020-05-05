@@ -55,7 +55,7 @@ namespace ChatServerCS
                 User newUser = new User { Name = name, ID = Context.ConnectionId, Photo = photo };
                 Context.Items["Name"] = name;
                 var added = ChatClients[name] = newUser;
-                await Clients.Others.SendAsync(new ParticipantLogin { Client = newUser });
+                await Clients.Others.SendAsync(new ParticipantReconnection { Name = newUser.Name });
                 return users;
             }
             return null;

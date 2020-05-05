@@ -14,6 +14,7 @@ using System.Windows.Input;
 using System.Diagnostics;
 using System.Net;
 using System.Reactive.Linq;
+using System.Windows.Threading;
 using ChatInterface.Server;
 using ChatServerCS;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -24,7 +25,6 @@ namespace ChatClientCS.ViewModels
     public class MainWindowViewModel : ViewModelBase
     {
         private IDialogService dialogService;
-        private TaskFactory ctxTaskFactory;
         private const int MAX_IMAGE_WIDTH = 150;
         private const int MAX_IMAGE_HEIGHT = 150;
 
@@ -164,7 +164,7 @@ namespace ChatClientCS.ViewModels
                 users = await LoginAsync(_userName, Avatar());
                 if (users != null)
                 {
-                    users.ForEach(u => Participants.Add(new Participant { Name = u.Name, Photo = u.Photo }));
+                    users.Where(user => user.Name != _userName).ToList().ForEach(u => Participants.Add(new Participant { Name = u.Name, Photo = u.Photo }));
                     UserMode = UserModes.Chat;
                     IsLoggedIn = true;
                     return true;
@@ -310,7 +310,8 @@ namespace ChatClientCS.ViewModels
             finally
             {
                 ChatMessage msg = new ChatMessage { Author = UserName, Picture = pic, Time = DateTime.Now, IsOriginNative = true };
-                SelectedParticipant.Chatter.Add(msg);
+                await Dispatcher.CurrentDispatcher.InvokeAsync(() =>
+                    SelectedParticipant.Chatter.Add(msg));
             }           
         }
 
@@ -367,22 +368,23 @@ namespace ChatClientCS.ViewModels
         #endregion
 
         #region Event Handlers
-        private void NewTextMessage(string name, string msg, MessageType mt)
+        private async Task NewTextMessage(string name, string msg, MessageType mt)
         {
             if (mt == MessageType.Unicast)
             {
                 ChatMessage cm = new ChatMessage { Author = name, Message = msg, Time = DateTime.Now };
                 var sender = _participants.Where((u) => string.Equals(u.Name, name)).FirstOrDefault();
-                ctxTaskFactory.StartNew(() => sender.Chatter.Add(cm)).Wait();
 
+                await Dispatcher.CurrentDispatcher.InvokeAsync(() => sender.Chatter.Add(cm));
+                
                 if (!(SelectedParticipant != null && sender.Name.Equals(SelectedParticipant.Name)))
                 {
-                    ctxTaskFactory.StartNew(() => sender.HasSentNewMessage = true).Wait();
+                    await Dispatcher.CurrentDispatcher.InvokeAsync(() => sender.HasSentNewMessage = true);
                 }
             }
         }
 
-        private void NewImageMessage(string name, byte[] pic, MessageType mt)
+        private async Task NewImageMessage(string name, byte[] pic, MessageType mt)
         {
             if (mt == MessageType.Unicast)
             {
@@ -400,11 +402,11 @@ namespace ChatClientCS.ViewModels
 
                 ChatMessage cm = new ChatMessage { Author = name, Picture = imgPath, Time = DateTime.Now };
                 var sender = _participants.Where(u => string.Equals(u.Name, name)).FirstOrDefault();
-                ctxTaskFactory.StartNew(() => sender.Chatter.Add(cm)).Wait();
+                await Dispatcher.CurrentDispatcher.InvokeAsync(() => sender.Chatter.Add(cm));
 
                 if (!(SelectedParticipant != null && sender.Name.Equals(SelectedParticipant.Name)))
                 {
-                    ctxTaskFactory.StartNew(() => sender.HasSentNewMessage = true).Wait();
+                    await Dispatcher.CurrentDispatcher.InvokeAsync(() => sender.HasSentNewMessage = true);
                 }
             }
         }
@@ -414,11 +416,18 @@ namespace ChatClientCS.ViewModels
             var ptp = Participants.FirstOrDefault(p => string.Equals(p.Name, u.Name));
             if (_isLoggedIn && ptp == null)
             {
-                ctxTaskFactory.StartNew(() => Participants.Add(new Participant
+                Participants.Add(new Participant
                 {
                     Name = u.Name,
                     Photo = u.Photo
-                })).Wait();
+                });
+            }
+            else
+            {
+                if (_isLoggedIn)
+                {
+                    ptp.IsLoggedIn = true;
+                }
             }
         }
 
@@ -482,7 +491,6 @@ namespace ChatClientCS.ViewModels
         public MainWindowViewModel(IDialogService diagSvc)
         {
             dialogService = diagSvc;
-            ctxTaskFactory = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext());
         }
 
         private  async Task ConnectAsync()
@@ -496,10 +504,10 @@ namespace ChatClientCS.ViewModels
             connection.Subscribe<ParticipantLogout>(n => ParticipantDisconnection(n.Name));
             connection.Subscribe<ParticipantDisconnection>(n => ParticipantDisconnection(n.Name));
             connection.Subscribe<ParticipantReconnection>(n => ParticipantReconnection(n.Name));
-            connection.Subscribe<BroadcastTextMessage>(n => NewTextMessage(n.Sender, n.Message, MessageType.Broadcast));
-            connection.Subscribe<BroadcastPictureMessage>(n => NewImageMessage(n.Sender, n.Img, MessageType.Broadcast));
-            connection.Subscribe<UnicastTextMessage>(n => NewTextMessage(n.Sender, n.Message, MessageType.Unicast));
-            connection.Subscribe<UnicastPictureMessage>(n => NewImageMessage(n.Sender, n.Img, MessageType.Unicast));
+            connection.Subscribe<BroadcastTextMessage>(async n => await NewTextMessage(n.Sender, n.Message, MessageType.Broadcast));
+            connection.Subscribe<BroadcastPictureMessage>(async n => await NewImageMessage(n.Sender, n.Img, MessageType.Broadcast));
+            connection.Subscribe<UnicastTextMessage>(async n => await NewTextMessage(n.Sender, n.Message, MessageType.Unicast));
+            connection.Subscribe<UnicastPictureMessage>(async n => await NewImageMessage(n.Sender, n.Img, MessageType.Unicast));
             connection.Subscribe<ParticipantTyping>(p => ParticipantTyping(p.Sender));
 
             connection.Reconnecting += e =>
