@@ -5,16 +5,9 @@
     <UseWPF>True</UseWPF>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CommonServiceLocator" Version="2.0.5" />
-    <PackageReference Include="ControlzEx" Version="4.3.0-alpha0081" />
-    <PackageReference Include="MahApps.Metro" Version="2.0.0-alpha0748" />
-    <PackageReference Include="MaterialDesignColors" Version="1.2.4-ci1254" />
-    <PackageReference Include="MaterialDesignThemes" Version="3.1.1-ci1254" />
     <PackageReference Include="MaterialDesignThemes.MahApps" Version="0.1.2-ci1254" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="3.1.3" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="SignalR.EasyUse.Client" Version="0.1.2" />
-    <PackageReference Include="System.Reactive" Version="4.4.1" />
     <PackageReference Include="System.Reactive.Core" Version="4.4.1" />
     <PackageReference Include="System.Reactive.Interfaces" Version="4.4.1" />
     <PackageReference Include="System.Reactive.Linq" Version="4.4.1" />
@@ -24,16 +17,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ChatInterface\ChatInterface.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="System.Windows" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.Net.Http" />
-    <Reference Include="System.Xaml" />
-    <Reference Include="WindowsBase" />
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Imgs\blank.png" />
