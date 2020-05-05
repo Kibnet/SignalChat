@@ -11,7 +11,6 @@ namespace ChatClientCS.Utils
         public ViewModelLocator()
         {
             container = new UnityContainer();
-            container.RegisterType<IChatService, ChatService>();
             container.RegisterType<IDialogService, DialogService>();
         }
 

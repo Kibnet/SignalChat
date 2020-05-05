@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,24 +11,39 @@ using ChatClientCS.Models;
 using ChatClientCS.Commands;
 using ChatInterface.Server;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Diagnostics;
+using System.Net;
 using System.Reactive.Linq;
+using ChatInterface.Server;
+using ChatServerCS;
+using Microsoft.AspNetCore.SignalR.Client;
+using SignalR.EasyUse.Client;
 
 namespace ChatClientCS.ViewModels
 {
     public class MainWindowViewModel : ViewModelBase
     {
-        private IChatService chatService;
         private IDialogService dialogService;
         private TaskFactory ctxTaskFactory;
         private const int MAX_IMAGE_WIDTH = 150;
         private const int MAX_IMAGE_HEIGHT = 150;
 
+        private HubConnection connection;
+        private IChatHub hub;
+        private string url = "http://localhost:5000/signalchat";
+
+        public class RetryPolicy : IRetryPolicy
+        {
+            public TimeSpan? NextRetryDelay(RetryContext retryContext)
+            {
+                return TimeSpan.FromMilliseconds(1);
+            }
+        }
+        
         private string _userName;
         public string UserName
         {
-            get { return _userName; }
+            get => _userName;
             set
             {
                 _userName = value;
@@ -39,7 +54,7 @@ namespace ChatClientCS.ViewModels
         private string _profilePic;
         public string ProfilePic
         {
-            get { return _profilePic; }
+            get => _profilePic;
             set
             {
                 _profilePic = value;
@@ -50,7 +65,7 @@ namespace ChatClientCS.ViewModels
         private ObservableCollection<Participant> _participants = new ObservableCollection<Participant>();
         public ObservableCollection<Participant> Participants
         {
-            get { return _participants; }
+            get => _participants;
             set
             {
                 _participants = value;
@@ -61,7 +76,7 @@ namespace ChatClientCS.ViewModels
         private Participant _selectedParticipant;
         public Participant SelectedParticipant
         {
-            get { return _selectedParticipant; }
+            get => _selectedParticipant;
             set
             {
                 _selectedParticipant = value;
@@ -73,7 +88,7 @@ namespace ChatClientCS.ViewModels
         private UserModes _userMode;
         public UserModes UserMode
         {
-            get { return _userMode; }
+            get => _userMode;
             set
             {
                 _userMode = value;
@@ -84,7 +99,7 @@ namespace ChatClientCS.ViewModels
         private string _textMessage;
         public string TextMessage
         {
-            get { return _textMessage; }
+            get => _textMessage;
             set
             {
                 _textMessage = value;
@@ -95,7 +110,7 @@ namespace ChatClientCS.ViewModels
         private bool _isConnected;
         public bool IsConnected
         {
-            get { return _isConnected; }
+            get => _isConnected;
             set
             {
                 _isConnected = value;
@@ -106,7 +121,7 @@ namespace ChatClientCS.ViewModels
         private bool _isLoggedIn;
         public bool IsLoggedIn
         {
-            get { return _isLoggedIn; }
+            get => _isLoggedIn;
             set
             {
                 _isLoggedIn = value;
@@ -116,19 +131,13 @@ namespace ChatClientCS.ViewModels
 
         #region Connect Command
         private ICommand _connectCommand;
-        public ICommand ConnectCommand
-        {
-            get
-            {
-                return _connectCommand ?? (_connectCommand = new RelayCommandAsync(() => Connect()));
-            }
-        }
+        public ICommand ConnectCommand => _connectCommand ?? (_connectCommand = new RelayCommandAsync(Connect));
 
         private async Task<bool> Connect()
         {
             try
             {
-                await chatService.ConnectAsync();
+                await ConnectAsync();
                 IsConnected = true;
                 return true;
             }
@@ -143,7 +152,7 @@ namespace ChatClientCS.ViewModels
             get
             {
                 return _loginCommand ?? (_loginCommand =
-                    new RelayCommandAsync(() => Login(), (o) => CanLogin()));
+                    new RelayCommandAsync(Login, (o) => CanLogin()));
             }
         }
 
@@ -152,7 +161,7 @@ namespace ChatClientCS.ViewModels
             try
             {
                 List<User> users = new List<User>();
-                users = await chatService.LoginAsync(_userName, Avatar());
+                users = await LoginAsync(_userName, Avatar());
                 if (users != null)
                 {
                     users.ForEach(u => Participants.Add(new Participant { Name = u.Name, Photo = u.Photo }));
@@ -191,7 +200,7 @@ namespace ChatClientCS.ViewModels
         {
             try
             {
-                await chatService.LogoutAsync();
+                await hub.Logout();
                 UserMode = UserModes.Login;
                 return true;
             }
@@ -219,7 +228,8 @@ namespace ChatClientCS.ViewModels
         {
             try
             {
-                await chatService.TypingAsync(SelectedParticipant.Name);
+                string recepient = SelectedParticipant.Name;
+                await hub.Typing(recepient);
                 return true;
             }
             catch (Exception) { return false; }
@@ -247,7 +257,7 @@ namespace ChatClientCS.ViewModels
             try
             {
                 var recepient = _selectedParticipant.Name;
-                await chatService.SendUnicastMessageAsync(recepient, _textMessage);
+                await hub.UnicastTextMessage(recepient, _textMessage);
                 return true;
             }
             catch (Exception) { return false; }
@@ -279,7 +289,7 @@ namespace ChatClientCS.ViewModels
             get
             {
                 return _sendImageMessageCommand ?? (_sendImageMessageCommand =
-                    new RelayCommandAsync(() => SendImageMessage(), (o) => CanSendImageMessage()));
+                    new RelayCommandAsync(SendImageMessage, (o) => CanSendImageMessage()));
             }
         }
 
@@ -293,7 +303,7 @@ namespace ChatClientCS.ViewModels
             try
             {
                 var recepient = _selectedParticipant.Name;
-                await chatService.SendUnicastMessageAsync(recepient, img);
+                await hub.UnicastImageMessage(recepient, img);
                 return true;
             }
             catch (Exception) { return false; }
@@ -344,7 +354,7 @@ namespace ChatClientCS.ViewModels
             get
             {
                 return _openImageCommand ?? (_openImageCommand =
-                    new RelayCommand<ChatMessage>((m) => OpenImage(m)));
+                    new RelayCommand<ChatMessage>(OpenImage));
             }
         }
 
@@ -433,19 +443,19 @@ namespace ChatClientCS.ViewModels
         private async void Reconnected()
         {
             var pic = Avatar();
-            if (!string.IsNullOrEmpty(_userName)) await chatService.LoginAsync(_userName, pic);
+            if (!string.IsNullOrEmpty(_userName)) await LoginAsync(_userName, pic);
             IsConnected = true;
             IsLoggedIn = true;
         }
 
         private async void Disconnected()
         {
-            var connectionTask = chatService.ConnectAsync();
+            var connectionTask = ConnectAsync();
             await connectionTask.ContinueWith(t => {
                 if (!t.IsFaulted)
                 {
                     IsConnected = true;
-                    chatService.LoginAsync(_userName, Avatar()).Wait();
+                    LoginAsync(_userName, Avatar()).Wait();
                     IsLoggedIn = true;
                 }
             });
@@ -469,24 +479,52 @@ namespace ChatClientCS.ViewModels
             return pic;
         }
 
-        public MainWindowViewModel(IChatService chatSvc, IDialogService diagSvc)
+        public MainWindowViewModel(IDialogService diagSvc)
         {
             dialogService = diagSvc;
-            chatService = chatSvc;
-
-            chatSvc.NewTextMessage += NewTextMessage;
-            chatSvc.NewImageMessage += NewImageMessage;
-            chatSvc.ParticipantLoggedIn += ParticipantLogin;
-            chatSvc.ParticipantLoggedOut += ParticipantDisconnection;
-            chatSvc.ParticipantDisconnected += ParticipantDisconnection;
-            chatSvc.ParticipantReconnected += ParticipantReconnection;
-            chatSvc.ParticipantTyping += ParticipantTyping;
-            chatSvc.ConnectionReconnecting += Reconnecting;
-            chatSvc.ConnectionReconnected += Reconnected;
-            chatSvc.ConnectionClosed += Disconnected;
-
             ctxTaskFactory = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext());
         }
 
+        private  async Task ConnectAsync()
+        {
+            var builder = new HubConnectionBuilder()
+                .WithUrl(new Uri(url))
+                .WithAutomaticReconnect(new RetryPolicy());
+            connection = builder.Build();
+            hub = connection.CreateHub<IChatHub>();
+            connection.Subscribe<ParticipantLogin>(d => ParticipantLogin(d.Client));
+            connection.Subscribe<ParticipantLogout>(n => ParticipantDisconnection(n.Name));
+            connection.Subscribe<ParticipantDisconnection>(n => ParticipantDisconnection(n.Name));
+            connection.Subscribe<ParticipantReconnection>(n => ParticipantReconnection(n.Name));
+            connection.Subscribe<BroadcastTextMessage>(n => NewTextMessage(n.Sender, n.Message, MessageType.Broadcast));
+            connection.Subscribe<BroadcastPictureMessage>(n => NewImageMessage(n.Sender, n.Img, MessageType.Broadcast));
+            connection.Subscribe<UnicastTextMessage>(n => NewTextMessage(n.Sender, n.Message, MessageType.Unicast));
+            connection.Subscribe<UnicastPictureMessage>(n => NewImageMessage(n.Sender, n.Img, MessageType.Unicast));
+            connection.Subscribe<ParticipantTyping>(p => ParticipantTyping(p.Sender));
+
+            connection.Reconnecting += e =>
+            {
+                Reconnecting();
+                return Task.CompletedTask;
+            };
+            connection.Reconnected += s =>
+            {
+                Reconnected();
+                return Task.CompletedTask;
+            };
+            connection.Closed += e =>
+            {
+                Disconnected();
+                return Task.CompletedTask;
+            };
+
+            ServicePointManager.DefaultConnectionLimit = 10;
+            await connection.StartAsync();
+        }
+
+        public async Task<List<User>> LoginAsync(string name, byte[] photo)
+        {
+            return await connection.InvokeCoreAsync<List<User>>("Login", new object[] { name, photo });
+        }
     }
 }
