@@ -532,7 +532,8 @@ namespace ChatClientCS.ViewModels
 
         public async Task<List<User>> LoginAsync(string name, byte[] photo)
         {
-            return await connection.InvokeCoreAsync<List<User>>("Login", new object[] { name, photo });
+            var login = await hub.Login(name, photo);
+            return login;
         }
     }
 }
